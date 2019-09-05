@@ -420,6 +420,83 @@ p10 = {exp(f1) / (1 + exp(f1) + exp(f2) + exp(f1 + f2 + f12))} %T>% hist()
 p01 = {exp(f2) / (1 + exp(f1) + exp(f2) + exp(f1 + f2 + f12))} %T>% hist()
 p11 = {exp(f1 + f2 + f12) / (1 + exp(f1) + exp(f2) + exp(f1 + f2 + f12))} %T>% hist()
 
+######################################################################
+# It just so happens that we can avoid a lot of the math above through
+# explotiing the conjungacy of the dirichlet distribution before we
+# transform into the natural parameters, and I think that it is wise
+# if we do that here. The following code looks at the effect that 
+# different priors on \alpha have on the posterior inferences, and it 
+# looks to confirm some of the formulas regarding the marginal and 
+# conditional distributions. 
+######################################################################
+
+library(LCA)
+
+data = MCMCpack::rdirichlet(15000, c(2,2))
+adply(data, 1,  function(i) {
+  i[1] / i[2]
+})$V1 %>% log %>% hist(breaks = 50, freq = F)
+curve(dnorm, add = T)
+
+const = 1.5
+x = MCMCpack::rdirichlet(15000, c(5, 0,0,0) + const)
+p0x = x %>% .[,c(1,2)] %>% rowSums()
+p01 = x %>% .[,2]
+# p1 = x[,c(2,4)] %>% rowSums()
+# lines(density(p1), col = "red")
+
+# curve(dbeta())
+p1given0 = p01 / p0x
+plot(density((p1given0)))
+curve(dbeta(x, const,5 + const), add = T, n = 300, col = "red")
+
+# Marginal confirmtion
+x = MCMCpack::rdirichlet(15000, c(1,2,3,4,5,6,7,8))
+p1 = x %>% .[,c(5,6,7,8)] %>% rowSums()
+plot(density(p1))
+curve(dbeta(x, 5+6+7+8, 1 + 2 + 3 + 4), add = T, n = 300, col = "red")
+
+# Marginal multivariate confirmtion
+denom = 8
+x = MCMCpack::rdirichlet(15000, c(1,2,3,4,5,6,7,8)/ denom)
+p1 = x %>% .[,c(3,7)]
+xx = seq(0.01,.99,length = 100)
+mat = outer(xx,xx,FUN = function(x,y) {
+  sapply(seq_along(x), function(i) {
+    MCMCpack::ddirichlet(c(x[i],y[i],1-x[i]-y[i]), c(3,7, sum(1,2,4,5,6,8))/denom)  
+  })
+})
+contour(xx,xx,mat, col = "red", nlevels = 50)
+points(p1,col=scales::alpha("black", 0.05))
+
+
+# Conditional Distribution univariate confirmation
+x = MCMCpack::rdirichlet(15000, c(1,2,3,4,5,6,7,8))
+num = x %>% .[,c(6,8)] %>% rowSums()
+denom = x %>% .[,c(2,4,6,8)] %>% rowSums()
+plot(density(num / denom))
+b = 1 - sum(c(2,4,6,8)) / sum(1:8)
+curve(dbeta(x,6 + 8, 2 + 4), add = T, n = 300, col = "red")
+
+# Conditional Distribution multivariate confirmation
+const = 4
+x = MCMCpack::rdirichlet(15000, c(1,2,3,4,5,6,7,8)/ const)
+num = x %>% .[,c(6,8)] 
+denom = x %>% .[,c(2,4,6,8)] %>% rowSums()
+plot(num / denom, xlim = c(0,1), ylim = c(0,1), col = scales::alpha("black", 0.1))
+xx = seq(0.01,.99,length = 100)
+mat = outer(xx,xx,FUN = function(x,y) {
+  sapply(seq_along(x), function(i) {
+    MCMCpack::ddirichlet(c(x[i],y[i],1-x[i]-y[i]), c(6,8,2 + 4)/const)  
+  })
+})
+contour(xx,xx,mat, col = "red", nlevels = 50)
+points(num / denom,col=scales::alpha("black", 0.05))
+
+
+
+
+
 
 
 
